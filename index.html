@@ -1,313 +1,837 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8">
-  <title>瑞士行 - Travel Map</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>瑞士行 - 互動式旅遊地圖</title>
   <style>
-    /* 取消預設邊界與滾動，確保滿版且不會垂直捲動 */
-    html, body {
-      height: 100%;
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      overflow: hidden;
+    }
+    
+    body {
       font-family: Arial, sans-serif;
-    }
-    /* 使用 flex 排版，左側為圖層控制，右側為地圖 */
-    #container {
+      height: 100vh;
       display: flex;
-      height: 100%;
+      flex-direction: column;
     }
-    /* 左側欄位 */
+    
+    #header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    #main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    
     #sidebar {
-      width: 250px;
-      background-color: #f8f8f8;
-      padding: 10px;
-      box-sizing: border-box;
+      width: 300px;
+      background-color: #f5f5f5;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      z-index: 2;
     }
-    /* 右側地圖容器 */
-    #map {
+    
+    #map-container {
       flex: 1;
       position: relative;
     }
-    /* 地圖上控制項：POI 滑桿 */
-    #poi-control {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 5px;
-      font-size: 14px;
-      margin: 10px;
+    
+    #map {
+      height: 100%;
+      width: 100%;
     }
-    /* 右上角繪圖工具 */
+    
+    .layer-item {
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .layer-item h3 {
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .import-section {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 5px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .button:hover {
+      background-color: #2980b9;
+    }
+    
+    .toggle-visibility {
+      cursor: pointer;
+      color: #7f8c8d;
+    }
+    
+    .toggle-visibility:hover {
+      color: #2c3e50;
+    }
+    
     #drawing-tools {
       position: absolute;
       top: 10px;
       right: 10px;
-      background: #fff;
-      padding: 5px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      padding: 8px;
+      z-index: 1;
+    }
+    
+    #drawing-tools button {
+      display: block;
+      width: 100%;
+      margin-bottom: 5px;
+      background-color: #f8f9fa;
+      border: 1px solid #dadce0;
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    
+    #drawing-tools button:hover {
+      background-color: #e8eaed;
+    }
+    
+    #drawing-tools button.active {
+      background-color: #e0f0fd;
+      border-color: #3498db;
+    }
+    
+    #poi-density-control {
+      position: absolute;
+      bottom: 20px;
+      left: 320px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      padding: 10px;
+      z-index: 1;
+    }
+    
+    #weather-widget {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      padding: 10px;
+      z-index: 1;
+      min-width: 200px;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      padding: 10px;
+      z-index: 10;
+      max-width: 300px;
+    }
+    
+    input[type="file"] {
+      margin: 10px 0;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+    }
+    
+    .travel-tips {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #e8f4fc;
+      border-radius: 5px;
+    }
+    
+    #search-box {
+      margin-bottom: 15px;
+      position: relative;
+    }
+    
+    #search-input {
+      width: 100%;
+      padding: 8px;
       border: 1px solid #ccc;
-      z-index: 5;
+      border-radius: 4px;
     }
-    /* 地圖標題 (置中) */
-    #map-title {
-      background: #fff;
-      border: 1px solid #000;
-      padding: 5px;
-      margin: 10px;
-      font-weight: bold;
+    
+    #itinerary-section {
+      margin-top: 20px;
     }
-    /* 左側欄位其他控制項 */
-    .control {
-      margin-bottom: 10px;
+    
+    .itinerary-day {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    #layer-list {
-      list-style: none;
-      padding-left: 5px;
-      margin: 0;
+    
+    .transport-icons {
+      margin-top: 5px;
+      display: flex;
+      gap: 5px;
+    }
+    
+    .transport-icons img {
+      width: 20px;
+      height: 20px;
     }
   </style>
 </head>
 <body>
-  <div id="container">
-    <!-- 左側欄位：圖層控制與匯入功能 -->
+  <div id="header">
+    <h1>瑞士行</h1>
+    <div>
+      <button id="save-button" class="button">儲存資料</button>
+      <button id="share-button" class="button">分享地圖</button>
+    </div>
+  </div>
+  
+  <div id="main-container">
     <div id="sidebar">
-      <h2>圖層控制</h2>
-      <div class="control">
-        <input type="file" id="file-input" multiple />
-        <p>支援格式：KML、CSV、JSON</p>
+      <div id="search-box">
+        <input type="text" id="search-input" placeholder="搜尋地點...">
       </div>
-      <div class="control">
-        <h3>圖層列表</h3>
-        <ul id="layer-list">
-          <!-- 動態新增圖層名稱 -->
-        </ul>
+      
+      <div class="import-section">
+        <h2>匯入資料</h2>
+        <input type="file" id="file-upload" accept=".kml,.csv,.json,.geojson">
+        <button id="import-button" class="button">匯入</button>
+        <div>
+          <small>支援格式: KML, CSV, JSON</small>
+        </div>
+      </div>
+      
+      <div id="layers-section">
+        <h2>圖層</h2>
+        <button id="add-layer-button" class="button">新增圖層</button>
+        
+        <div id="layers-container">
+          <!-- 圖層會動態添加在這裡 -->
+          <div class="layer-item">
+            <h3>
+              景點圖層
+              <span class="toggle-visibility">👁️</span>
+            </h3>
+            <div class="layer-content">
+              <small>包含 5 個地點</small>
+            </div>
+          </div>
+          
+          <div class="layer-item">
+            <h3>
+              餐廳圖層
+              <span class="toggle-visibility">👁️</span>
+            </h3>
+            <div class="layer-content">
+              <small>包含 3 個地點</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="itinerary-section">
+        <h2>行程規劃</h2>
+        <button id="add-day-button" class="button">新增天數</button>
+        
+        <div class="itinerary-day">
+          <h3>第 1 天</h3>
+          <div>蘇黎世 → 琉森</div>
+          <div class="transport-icons">
+            <span title="火車">🚂</span>
+            <span title="步行">🚶</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="travel-tips">
+        <h3>旅遊小貼士</h3>
+        <p>瑞士的公共交通非常發達，建議購買瑞士旅行通行證可以節省費用。</p>
+        <button id="more-tips-button" class="button">更多貼士</button>
       </div>
     </div>
-    <!-- 右側：地圖 -->
-    <div id="map"></div>
+    
+    <div id="map-container">
+      <div id="map"></div>
+      
+      <div id="drawing-tools">
+        <button id="marker-tool" class="active">📍 標記點</button>
+        <button id="line-tool">〰️ 路線</button>
+        <button id="polygon-tool">⬛ 區域</button>
+        <button id="circle-tool">⭕ 圓形</button>
+        <button id="hand-tool">✋ 移動</button>
+        <button id="delete-tool">🗑️ 刪除</button>
+      </div>
+      
+      <div id="poi-density-control">
+        <label for="poi-density">景點/商家顯示密度:</label>
+        <input type="range" id="poi-density" min="0" max="100" value="50">
+      </div>
+      
+      <div id="weather-widget">
+        <h3>蘇黎世天氣</h3>
+        <div>☀️ 22°C</div>
+        <small>未來一週溫度: 18°C - 25°C</small>
+      </div>
+    </div>
   </div>
-
-  <!-- 地圖上加入 POI 調整滑桿 -->
-  <div id="poi-control" style="position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index:5;">
-    <label for="poi-density">POI 顯示密度：</label>
-    <input type="range" id="poi-density" min="0" max="100" value="50">
-  </div>
-
-  <!-- 右上角繪圖工具 -->
-  <div id="drawing-tools">
-    <button id="toggle-drawing">啟用繪圖</button>
-    <button id="save-drawing">儲存圖層</button>
-  </div>
-
-  <!-- 地圖上方標題 -->
-  <div id="map-title" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index:5;">
-    瑞士行
-  </div>
-
-  <!-- 載入 Google Maps API，包含 drawing 與 places 函式庫，請將 YOUR_API_KEY 換成您的金鑰 -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=drawing,places"></script>
+  
   <script>
+    // 全局變量
     let map;
     let drawingManager;
-    let currentDrawing = null;
-    let poiMarkers = [];
-    let currentLayerMarkers = [];
     let layers = [];
-
+    let activeMarkerId = null;
+    let markers = [];
+    let polylines = [];
+    let polygons = [];
+    let activeDrawingTool = 'marker';
+    
+    // 初始化地圖
     function initMap() {
-      // 設定瑞士中央座標
-      const swissCenter = { lat: 46.8182, lng: 8.2275 };
+      // 瑞士中心點坐標 (大約在 Bern 附近)
+      const switzerlandCenter = { lat: 46.8182, lng: 8.2275 };
+      
+      // 創建地圖
       map = new google.maps.Map(document.getElementById('map'), {
-        center: swissCenter,
+        center: switzerlandCenter,
         zoom: 8,
-        mapTypeId: 'roadmap'
+        mapTypeId: google.maps.MapTypeId.TERRAIN,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+          position: google.maps.ControlPosition.TOP_LEFT
+        }
       });
-
-      // 點擊地圖新增標記
-      map.addListener('click', function(e) {
-        addMarkerToCurrentLayer(e.latLng);
-      });
-
-      // 初始化繪圖工具
-      initDrawingManager();
-
-      // 初始化檔案匯入功能
-      document.getElementById('file-input').addEventListener('change', handleFileSelect, false);
-
-      // 初始化 POI 調整功能 (地圖上控制)
-      document.getElementById('poi-density').addEventListener('input', function(e) {
-        adjustPOIDensity(e.target.value);
-      });
-    }
-
-    function initDrawingManager() {
+      
+      // 初始化繪圖管理器
       drawingManager = new google.maps.drawing.DrawingManager({
         drawingMode: null,
         drawingControl: false,
-        markerOptions: { draggable: true },
-        polylineOptions: { editable: true },
-        polygonOptions: { editable: true },
-        rectangleOptions: { editable: true },
-        circleOptions: { editable: true }
+        markerOptions: {
+          draggable: true
+        },
+        polylineOptions: {
+          strokeColor: '#FF0000',
+          strokeWeight: 3
+        },
+        polygonOptions: {
+          strokeColor: '#FF0000',
+          strokeWeight: 2,
+          fillColor: '#FF0000',
+          fillOpacity: 0.3
+        },
+        circleOptions: {
+          strokeColor: '#FF0000',
+          strokeWeight: 2,
+          fillColor: '#FF0000',
+          fillOpacity: 0.3
+        }
       });
+      
       drawingManager.setMap(map);
-
-      // 繪製完成後處理
-      google.maps.event.addListener(drawingManager, 'overlaycomplete', function(e) {
-        currentDrawing = e.overlay;
-        addLayer('自定義繪圖');
+      
+      // 添加事件監聽器
+      setupEventListeners();
+      
+      // 添加一些預設標記作為示例
+      addDefaultMarkers();
+      
+      // 初始化地點搜尋
+      initPlacesAutocomplete();
+    }
+    
+    function setupEventListeners() {
+      // 繪圖工具按鈕事件
+      document.getElementById('marker-tool').addEventListener('click', () => activateDrawingTool('marker'));
+      document.getElementById('line-tool').addEventListener('click', () => activateDrawingTool('polyline'));
+      document.getElementById('polygon-tool').addEventListener('click', () => activateDrawingTool('polygon'));
+      document.getElementById('circle-tool').addEventListener('click', () => activateDrawingTool('circle'));
+      document.getElementById('hand-tool').addEventListener('click', () => activateDrawingTool('hand'));
+      document.getElementById('delete-tool').addEventListener('click', () => activateDrawingTool('delete'));
+      
+      // 匯入按鈕事件
+      document.getElementById('import-button').addEventListener('click', importData);
+      
+      // 添加圖層按鈕
+      document.getElementById('add-layer-button').addEventListener('click', addNewLayer);
+      
+      // POI 密度滑塊事件
+      document.getElementById('poi-density').addEventListener('input', updatePoiDensity);
+      
+      // 儲存按鈕事件
+      document.getElementById('save-button').addEventListener('click', saveToCloud);
+      
+      // 分享按鈕事件
+      document.getElementById('share-button').addEventListener('click', shareMap);
+      
+      // 行程按鈕事件
+      document.getElementById('add-day-button').addEventListener('click', addItineraryDay);
+      
+      // 更多貼士按鈕
+      document.getElementById('more-tips-button').addEventListener('click', showMoreTips);
+      
+      // 圖層可見性切換
+      document.querySelectorAll('.toggle-visibility').forEach(toggle => {
+        toggle.addEventListener('click', toggleLayerVisibility);
       });
-
-      // 切換繪圖模式按鈕
-      document.getElementById('toggle-drawing').addEventListener('click', function() {
-        if (drawingManager.getDrawingMode()) {
+      
+      // 繪圖完成事件
+      google.maps.event.addListener(drawingManager, 'markercomplete', function(marker) {
+        addMarkerToActiveLayer(marker);
+      });
+      
+      google.maps.event.addListener(drawingManager, 'polylinecomplete', function(polyline) {
+        polylines.push(polyline);
+      });
+      
+      google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
+        polygons.push(polygon);
+      });
+      
+      google.maps.event.addListener(drawingManager, 'circlecomplete', function(circle) {
+        polygons.push(circle); // 為了簡單管理，圓形也放入 polygons 陣列
+      });
+      
+      // 地圖點擊事件，當手動添加標記時使用
+      google.maps.event.addListener(map, 'click', function(event) {
+        if (activeDrawingTool === 'marker') {
+          const marker = new google.maps.Marker({
+            position: event.latLng,
+            map: map,
+            draggable: true
+          });
+          
+          addMarkerToActiveLayer(marker);
+        }
+      });
+    }
+    
+    function activateDrawingTool(toolType) {
+      // 移除所有工具的 active 類
+      document.querySelectorAll('#drawing-tools button').forEach(button => {
+        button.classList.remove('active');
+      });
+      
+      activeDrawingTool = toolType;
+      
+      // 設置相應的繪圖模式
+      switch (toolType) {
+        case 'marker':
+          document.getElementById('marker-tool').classList.add('active');
+          drawingManager.setDrawingMode(null); // 我們使用地圖點擊事件來處理標記
+          break;
+        case 'polyline':
+          document.getElementById('line-tool').classList.add('active');
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
+          break;
+        case 'polygon':
+          document.getElementById('polygon-tool').classList.add('active');
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          break;
+        case 'circle':
+          document.getElementById('circle-tool').classList.add('active');
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.CIRCLE);
+          break;
+        case 'hand':
+          document.getElementById('hand-tool').classList.add('active');
           drawingManager.setDrawingMode(null);
-          this.innerText = '啟用繪圖';
-        } else {
-          // 預設為標記模式，可依需求切換為其他繪圖類型
-          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.MARKER);
-          this.innerText = '停用繪圖';
-        }
-      });
-
-      // 儲存繪圖按鈕
-      document.getElementById('save-drawing').addEventListener('click', function() {
-        if (currentDrawing) {
-          const data = getOverlayData(currentDrawing);
-          saveDataToCloud(data);
-        } else {
-          alert('目前沒有繪製的圖形');
-        }
-      });
-    }
-
-    // 將 overlay 轉成可存資料格式（點、線、面）
-    function getOverlayData(overlay) {
-      if (overlay.getPath) { // 多邊形或折線
-        const path = overlay.getPath().getArray().map(latlng => ({ lat: latlng.lat(), lng: latlng.lng() }));
-        return { type: 'poly', path: path };
-      } else if (overlay.getPosition) { // 標記
-        const pos = overlay.getPosition();
-        return { type: 'marker', position: { lat: pos.lat(), lng: pos.lng() } };
+          break;
+        case 'delete':
+          document.getElementById('delete-tool').classList.add('active');
+          drawingManager.setDrawingMode(null);
+          // 在刪除模式下，我們會讓用戶點擊要刪除的元素
+          break;
       }
-      return {};
     }
-
-    // 模擬儲存資料至 Google Cloud datasets（請自行串接後端 API）
-    function saveDataToCloud(data) {
-      console.log('Saving to Google Cloud:', data);
-      fetch('/saveData', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(response => response.json())
-      .then(result => {
-        console.log('Data saved:', result);
-      })
-      .catch(err => {
-        console.error('Error saving data:', err);
+    
+    function addMarkerToActiveLayer(marker) {
+      markers.push(marker);
+      
+      // 創建標記的信息窗口
+      const infoWindow = new google.maps.InfoWindow({
+        content: `
+          <div>
+            <h3>新地點</h3>
+            <p>緯度: ${marker.getPosition().lat().toFixed(6)}</p>
+            <p>經度: ${marker.getPosition().lng().toFixed(6)}</p>
+            <button id="edit-marker">編輯</button>
+          </div>
+        `
       });
-    }
-
-    // 點擊地圖新增標記，並將標記加入目前圖層
-    function addMarkerToCurrentLayer(location) {
-      const marker = new google.maps.Marker({
-        position: location,
-        map: map,
-        draggable: true
+      
+      // 添加標記點擊事件
+      marker.addListener('click', function() {
+        if (activeDrawingTool === 'delete') {
+          // 刪除模式下，點擊標記將其刪除
+          marker.setMap(null);
+          markers = markers.filter(m => m !== marker);
+        } else {
+          // 正常模式下，顯示標記的信息窗口
+          infoWindow.open(map, marker);
+        }
       });
-      currentLayerMarkers.push(marker);
-      addLayer('新增點');
-      // 同時模擬存入雲端
-      saveDataToCloud({ type: 'marker', position: { lat: location.lat(), lng: location.lng() } });
+      
+      // 更新圖層信息
+      updateLayersUI();
     }
-
-    // 處理檔案匯入：依副檔名處理 KML、JSON、CSV
-    function handleFileSelect(evt) {
-      const files = evt.target.files;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const content = e.target.result;
-          if (file.name.toLowerCase().endsWith('.kml')) {
-            // 利用 KmlLayer 匯入 KML 檔案
-            const kmlLayer = new google.maps.KmlLayer({
-              url: URL.createObjectURL(new Blob([content], {type: 'application/vnd.google-earth.kml+xml'})),
-              map: map
-            });
-            layers.push(kmlLayer);
-            addLayer(file.name);
-          } else if (file.name.toLowerCase().endsWith('.json')) {
-            // 假設 JSON 為點資料陣列：每個物件含 lat, lng, name
-            const jsonData = JSON.parse(content);
-            jsonData.forEach(item => {
-              const marker = new google.maps.Marker({
-                position: { lat: item.lat, lng: item.lng },
-                map: map,
-                title: item.name || ''
-              });
-              currentLayerMarkers.push(marker);
-            });
-            addLayer(file.name);
-          } else if (file.name.toLowerCase().endsWith('.csv')) {
-            // 簡易 CSV 解析，格式：lat,lng,name
-            const lines = content.split('\n');
-            lines.forEach(line => {
-              const parts = line.split(',');
-              if (parts.length >= 2) {
-                const lat = parseFloat(parts[0]);
-                const lng = parseFloat(parts[1]);
-                const title = parts[2] || '';
-                if (!isNaN(lat) && !isNaN(lng)) {
-                  const marker = new google.maps.Marker({
-                    position: { lat: lat, lng: lng },
-                    map: map,
-                    title: title
-                  });
-                  currentLayerMarkers.push(marker);
-                }
-              }
-            });
-            addLayer(file.name);
+    
+    function addDefaultMarkers() {
+      // 添加一些瑞士的主要城市作為示例
+      const cities = [
+        { name: '蘇黎世', lat: 47.3769, lng: 8.5417, info: '瑞士最大的城市，金融中心' },
+        { name: '日內瓦', lat: 46.2044, lng: 6.1432, info: '國際組織所在地，湖濱城市' },
+        { name: '伯恩', lat: 46.9480, lng: 7.4474, info: '瑞士首都，歷史老城區' },
+        { name: '琉森', lat: 47.0502, lng: 8.3093, info: '湖光山色，歷史悠久的城市' },
+        { name: '策馬特', lat: 46.0207, lng: 7.7491, info: '著名滑雪勝地，可欣賞馬特洪峰' }
+      ];
+      
+      cities.forEach(city => {
+        const marker = new google.maps.Marker({
+          position: { lat: city.lat, lng: city.lng },
+          map: map,
+          title: city.name,
+          animation: google.maps.Animation.DROP
+        });
+        
+        markers.push(marker);
+        
+        // 創建標記的信息窗口
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div>
+              <h3>${city.name}</h3>
+              <p>${city.info}</p>
+              <button id="add-to-itinerary">加入行程</button>
+            </div>
+          `
+        });
+        
+        // 添加標記點擊事件
+        marker.addListener('click', function() {
+          if (activeDrawingTool === 'delete') {
+            // 刪除模式下，點擊標記將其刪除
+            marker.setMap(null);
+            markers = markers.filter(m => m !== marker);
+          } else {
+            // 正常模式下，顯示標記的信息窗口
+            infoWindow.open(map, marker);
           }
-          // 匯入後模擬存入雲端
-          saveDataToCloud({ importedFile: file.name, content: content });
-        };
+        });
+      });
+    }
+    
+    function importData() {
+      const fileInput = document.getElementById('file-upload');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        alert('請選擇檔案');
+        return;
+      }
+      
+      const fileName = file.name;
+      const fileExtension = fileName.split('.').pop().toLowerCase();
+      
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const content = e.target.result;
+        
+        switch (fileExtension) {
+          case 'kml':
+            importKML(content);
+            break;
+          case 'json':
+          case 'geojson':
+            importJSON(content);
+            break;
+          case 'csv':
+            importCSV(content);
+            break;
+          default:
+            alert('不支援的檔案格式');
+        }
+      };
+      
+      if (fileExtension === 'kml') {
+        reader.readAsText(file);
+      } else if (fileExtension === 'json' || fileExtension === 'geojson') {
+        reader.readAsText(file);
+      } else if (fileExtension === 'csv') {
         reader.readAsText(file);
       }
     }
-
-    // 將新增的圖層名稱加入左側列表中
-    function addLayer(name) {
-      const li = document.createElement('li');
-      li.textContent = name;
-      document.getElementById('layer-list').appendChild(li);
-    }
-
-    // 調整 POI 顯示密度：依據 slider 數值模擬在瑞士附近隨機產生標記
-    function adjustPOIDensity(value) {
-      // 清除舊的 POI 標記
-      poiMarkers.forEach(marker => marker.setMap(null));
-      poiMarkers = [];
-      const numMarkers = Math.floor(value);
-      for (let i = 0; i < numMarkers; i++) {
-        const marker = new google.maps.Marker({
-          position: {
-            lat: 46.8182 + (Math.random() - 0.5),
-            lng: 8.2275 + (Math.random() - 0.5)
-          },
+    
+    function importKML(content) {
+      // 使用 Google Maps API 的 KmlLayer 功能
+      try {
+        // 先創建一個臨時 Blob 來創建一個可供 KmlLayer 使用的 URL
+        const blob = new Blob([content], { type: 'application/vnd.google-earth.kml+xml' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const kmlLayer = new google.maps.KmlLayer({
+          url: blobUrl,
           map: map,
-          icon: {
-            url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+          preserveViewport: true
+        });
+        
+        // 添加到圖層管理
+        layers.push({
+          name: '匯入的 KML 圖層',
+          type: 'kml',
+          layer: kmlLayer,
+          visible: true
+        });
+        
+        updateLayersUI();
+        
+        // 監聽 KML 圖層的狀態
+        google.maps.event.addListenerOnce(kmlLayer, 'status_changed', function() {
+          if (kmlLayer.getStatus() !== 'OK') {
+            alert('KML 匯入失敗: ' + kmlLayer.getStatus());
           }
         });
-        poiMarkers.push(marker);
+      } catch (error) {
+        console.error('KML 匯入錯誤:', error);
+        alert('KML 匯入發生錯誤: ' + error.message);
       }
     }
-
-    // 初始化地圖
-    window.onload = initMap;
-  </script>
-</body>
-</html>
+    
+    function importJSON(content) {
+      try {
+        const data = JSON.parse(content);
+        
+        // 處理 GeoJSON 格式
+        if (data.type === 'FeatureCollection') {
+          data.features.forEach(feature => {
+            if (feature.geometry.type === 'Point') {
+              const coords = feature.geometry.coordinates;
+              const marker = new google.maps.Marker({
+                position: { lat: coords[1], lng: coords[0] },
+                map: map,
+                title: feature.properties.name || '匯入點'
+              });
+              
+              markers.push(marker);
+            } else if (feature.geometry.type === 'LineString') {
+              const path = feature.geometry.coordinates.map(coord => {
+                return { lat: coord[1], lng: coord[0] };
+              });
+              
+              const polyline = new google.maps.Polyline({
+                path: path,
+                map: map,
+                strokeColor: '#FF0000',
+                strokeWeight: 2
+              });
+              
+              polylines.push(polyline);
+            } else if (feature.geometry.type === 'Polygon') {
+              const paths = feature.geometry.coordinates[0].map(coord => {
+                return { lat: coord[1], lng: coord[0] };
+              });
+              
+              const polygon = new google.maps.Polygon({
+                paths: paths,
+                map: map,
+                strokeColor: '#FF0000',
+                strokeWeight: 2,
+                fillColor: '#FF0000',
+                fillOpacity: 0.3
+              });
+              
+              polygons.push(polygon);
+            }
+          });
+        } else {
+          // 處理簡單的 JSON 陣列
+          data.forEach(item => {
+            if (item.lat && item.lng) {
+              const marker = new google.maps.Marker({
+                position: { lat: parseFloat(item.lat), lng: parseFloat(item.lng) },
+                map: map,
+                title: item.name || '匯入點'
+              });
+              
+              markers.push(marker);
+            }
+          });
+        }
+        
+        updateLayersUI();
+        
+      } catch (error) {
+        console.error('JSON 匯入錯誤:', error);
+        alert('JSON 匯入發生錯誤: ' + error.message);
+      }
+    }
+    
+    function importCSV(content) {
+      try {
+        // 簡單的 CSV 解析
+        const lines = content.split('\n');
+        const headers = lines[0].split(',');
+        
+        // 尋找緯度和經度的列
+        let latIndex = -1;
+        let lngIndex = -1;
+        let nameIndex = -1;
+        
+        headers.forEach((header, index) => {
+          const lowerHeader = header.toLowerCase().trim();
+          if (lowerHeader === 'lat' || lowerHeader === 'latitude' || lowerHeader === '緯度') {
+            latIndex = index;
+          } else if (lowerHeader === 'lng' || lowerHeader === 'longitude' || lowerHeader === 'long' || lowerHeader === '經度') {
+            lngIndex = index;
+          } else if (lowerHeader === 'name' || lowerHeader === 'title' || lowerHeader === '名稱') {
+            nameIndex = index;
+          }
+        });
+        
+        if (latIndex === -1 || lngIndex === -1) {
+          alert('CSV 檔案中找不到緯度或經度列');
+          return;
+        }
+        
+        // 從第二行開始處理數據
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          
+          const values = lines[i].split(',');
+          const lat = parseFloat(values[latIndex]);
+          const lng = parseFloat(values[lngIndex]);
+          const name = nameIndex !== -1 ? values[nameIndex] : '匯入點';
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            const marker = new google.maps.Marker({
+              position: { lat, lng },
+              map: map,
+              title: name
+            });
+            
+            markers.push(marker);
+          }
+        }
+        
+        updateLayersUI();
+        
+      } catch (error) {
+        console.error('CSV 匯入錯誤:', error);
+        alert('CSV 匯入發生錯誤: ' + error.message);
+      }
+    }
+    
+    function addNewLayer() {
+      const layerName = prompt('請輸入圖層名稱:', '新圖層');
+      if (!layerName) return;
+      
+      // 創建一個新的圖層對象
+      const newLayer = {
+        name: layerName,
+        type: 'custom',
+        markers: [],
+        visible: true
+      };
+      
+      layers.push(newLayer);
+      updateLayersUI();
+    }
+    
+    function updateLayersUI() {
+      const container = document.getElementById('layers-container');
+      container.innerHTML = '';
+      
+      // 添加預設圖層
+      container.innerHTML += `
+        <div class="layer-item">
+          <h3>
+            景點圖層
+            <span class="toggle-visibility" data-layer="attractions">👁️</span>
+          </h3>
+          <div class="layer-content">
+            <small>包含 ${markers.filter(m => m.title && ['蘇黎世', '日內瓦', '伯恩', '琉森', '策馬特'].includes(m.title)).length} 個地點</small>
+          </div>
+        </div>
+      `;
+      
+      // 添加自定義圖層
+      layers.forEach((layer, index) => {
+        container.innerHTML += `
+          <div class="layer-item">
+            <h3>
+              ${layer.name}
+              <span class="toggle-visibility" data-layer-index="${index}">👁️</span>
+            </h3>
+            <div class="layer-content">
+              <small>包含 ${layer.type === 'kml' ? '多個' : markers.length} 個地點</small>
+            </div>
+          </div>
+        `;
+      });
+      
+      // 重新綁定事件
+      document.querySelectorAll('.toggle-visibility').forEach(toggle => {
+        toggle.addEventListener('click', toggleLayerVisibility);
+      });
+    }
+    
+    function toggleLayerVisibility(event) {
+      const layerIndex = event.target.getAttribute('data-layer-index');
+      
+      if (layerIndex !== null) {
+        const layer = layers[layerIndex];
+        layer.visible = !layer.visible;
+        
+        if (layer.type === 'kml') {
+          layer.layer.setMap(layer.visible ? map : null);
+        } else {
+          // 自定義圖層的處理
+          // 在實際應用中，您需要追蹤每個圖層中的標記
+        }
+        
+        event.target.textContent = layer.visible ? '👁️' : '👁️‍🗨️';
+      } else {
+        // 預設圖層的處理
+        const layerName = event.target.getAttribute('
