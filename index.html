@@ -4,53 +4,114 @@
   <meta charset="utf-8">
   <title>瑞士行 - Travel Map</title>
   <style>
-    /* 基本樣式 */
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #map { height: 100%; width: calc(100% - 250px); float: right; }
-    #sidebar { width: 250px; height: 100%; float: left; overflow: auto; padding: 10px; background: #f8f8f8; }
-    .control { margin-bottom: 10px; }
-    #drawing-tools { position: absolute; top: 10px; right: 10px; background: white; padding: 5px; border: 1px solid #ccc; z-index: 5; }
-    #search-box { width: 90%; padding: 5px; margin-bottom: 10px; }
+    /* 取消預設邊界與滾動，確保滿版且不會垂直捲動 */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    /* 使用 flex 排版，左側為圖層控制，右側為地圖 */
+    #container {
+      display: flex;
+      height: 100%;
+    }
+    /* 左側欄位 */
+    #sidebar {
+      width: 250px;
+      background-color: #f8f8f8;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    /* 右側地圖容器 */
+    #map {
+      flex: 1;
+      position: relative;
+    }
+    /* 地圖上控制項：POI 滑桿 */
+    #poi-control {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 5px;
+      font-size: 14px;
+      margin: 10px;
+    }
+    /* 右上角繪圖工具 */
+    #drawing-tools {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #fff;
+      padding: 5px;
+      border: 1px solid #ccc;
+      z-index: 5;
+    }
+    /* 地圖標題 (置中) */
+    #map-title {
+      background: #fff;
+      border: 1px solid #000;
+      padding: 5px;
+      margin: 10px;
+      font-weight: bold;
+    }
+    /* 左側欄位其他控制項 */
+    .control {
+      margin-bottom: 10px;
+    }
+    #layer-list {
+      list-style: none;
+      padding-left: 5px;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
-  <!-- 左側欄位 -->
-  <div id="sidebar">
-    <h2>瑞士行 - 圖層控制</h2>
-    <div class="control">
-      <input type="file" id="file-input" multiple />
-      <p>支援格式: KML, CSV, JSON</p>
+  <div id="container">
+    <!-- 左側欄位：圖層控制與匯入功能 -->
+    <div id="sidebar">
+      <h2>圖層控制</h2>
+      <div class="control">
+        <input type="file" id="file-input" multiple />
+        <p>支援格式：KML、CSV、JSON</p>
+      </div>
+      <div class="control">
+        <h3>圖層列表</h3>
+        <ul id="layer-list">
+          <!-- 動態新增圖層名稱 -->
+        </ul>
+      </div>
     </div>
-    <div class="control">
-      <label for="poi-density">商家/地標顯示密度:</label>
-      <input type="range" id="poi-density" min="0" max="100" value="50">
-    </div>
-    <div class="control">
-      <h3>圖層列表</h3>
-      <ul id="layer-list">
-        <!-- 動態新增圖層名稱 -->
-      </ul>
-    </div>
+    <!-- 右側：地圖 -->
+    <div id="map"></div>
   </div>
-  
-  <!-- 地圖容器 -->
-  <div id="map"></div>
-  
+
+  <!-- 地圖上加入 POI 調整滑桿 -->
+  <div id="poi-control" style="position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index:5;">
+    <label for="poi-density">POI 顯示密度：</label>
+    <input type="range" id="poi-density" min="0" max="100" value="50">
+  </div>
+
   <!-- 右上角繪圖工具 -->
   <div id="drawing-tools">
     <button id="toggle-drawing">啟用繪圖</button>
     <button id="save-drawing">儲存圖層</button>
   </div>
-  
-  <!-- 載入 Google Maps API (記得將 YOUR_API_KEY 換成真實金鑰) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDdn8mykqlHT8WPT_tnrZmj5OS4JYw0UPM&libraries=drawing,places"></script>
+
+  <!-- 地圖上方標題 -->
+  <div id="map-title" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index:5;">
+    瑞士行
+  </div>
+
+  <!-- 載入 Google Maps API，包含 drawing 與 places 函式庫，請將 YOUR_API_KEY 換成您的金鑰 -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=drawing,places"></script>
   <script>
     let map;
     let drawingManager;
-    let layers = [];
-    let currentLayerMarkers = [];
-    let poiMarkers = [];
     let currentDrawing = null;
+    let poiMarkers = [];
+    let currentLayerMarkers = [];
+    let layers = [];
 
     function initMap() {
       // 設定瑞士中央座標
@@ -60,15 +121,6 @@
         zoom: 8,
         mapTypeId: 'roadmap'
       });
-      
-      // 顯示「瑞士行」標題 (以自訂控制項方式呈現)
-      const titleDiv = document.createElement('div');
-      titleDiv.style.backgroundColor = '#fff';
-      titleDiv.style.border = '1px solid #000';
-      titleDiv.style.padding = '5px';
-      titleDiv.style.margin = '10px';
-      titleDiv.innerHTML = '<strong>瑞士行</strong>';
-      map.controls[google.maps.ControlPosition.TOP_CENTER].push(titleDiv);
 
       // 點擊地圖新增標記
       map.addListener('click', function(e) {
@@ -78,20 +130,13 @@
       // 初始化繪圖工具
       initDrawingManager();
 
-      // 檔案匯入監聽
+      // 初始化檔案匯入功能
       document.getElementById('file-input').addEventListener('change', handleFileSelect, false);
 
-      // 調整 POI 密度 (此處僅模擬效果，實際可連接 Places API)
+      // 初始化 POI 調整功能 (地圖上控制)
       document.getElementById('poi-density').addEventListener('input', function(e) {
         adjustPOIDensity(e.target.value);
       });
-
-      // 切換繪圖模式
-      document.getElementById('toggle-drawing').addEventListener('click', toggleDrawingMode);
-      document.getElementById('save-drawing').addEventListener('click', saveDrawing);
-      
-      // 初始化搜尋框（旅遊地圖常見功能：快速搜尋景點或地址）
-      initSearchBox();
     }
 
     function initDrawingManager() {
@@ -106,37 +151,37 @@
       });
       drawingManager.setMap(map);
 
-      // 完成繪製後的事件處理
+      // 繪製完成後處理
       google.maps.event.addListener(drawingManager, 'overlaycomplete', function(e) {
         currentDrawing = e.overlay;
-        // 將繪製結果加入圖層列表
         addLayer('自定義繪圖');
+      });
+
+      // 切換繪圖模式按鈕
+      document.getElementById('toggle-drawing').addEventListener('click', function() {
+        if (drawingManager.getDrawingMode()) {
+          drawingManager.setDrawingMode(null);
+          this.innerText = '啟用繪圖';
+        } else {
+          // 預設為標記模式，可依需求切換為其他繪圖類型
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.MARKER);
+          this.innerText = '停用繪圖';
+        }
+      });
+
+      // 儲存繪圖按鈕
+      document.getElementById('save-drawing').addEventListener('click', function() {
+        if (currentDrawing) {
+          const data = getOverlayData(currentDrawing);
+          saveDataToCloud(data);
+        } else {
+          alert('目前沒有繪製的圖形');
+        }
       });
     }
 
-    function toggleDrawingMode() {
-      if (drawingManager.getDrawingMode()) {
-        drawingManager.setDrawingMode(null);
-        document.getElementById('toggle-drawing').innerText = '啟用繪圖';
-      } else {
-        // 這裡預設繪製標記，可依需求改為多邊形等模式
-        drawingManager.setDrawingMode(google.maps.drawing.OverlayType.MARKER);
-        document.getElementById('toggle-drawing').innerText = '停用繪圖';
-      }
-    }
-
-    function saveDrawing() {
-      if (currentDrawing) {
-        // 將繪製資料轉為儲存格式並送往後端 (後端需串接 Google Cloud datasets)
-        const data = getOverlayData(currentDrawing);
-        saveDataToCloud(data);
-      } else {
-        alert('目前沒有繪製的圖形');
-      }
-    }
-
+    // 將 overlay 轉成可存資料格式（點、線、面）
     function getOverlayData(overlay) {
-      // 將 overlay 轉為可儲存資料格式
       if (overlay.getPath) { // 多邊形或折線
         const path = overlay.getPath().getArray().map(latlng => ({ lat: latlng.lat(), lng: latlng.lng() }));
         return { type: 'poly', path: path };
@@ -147,8 +192,8 @@
       return {};
     }
 
+    // 模擬儲存資料至 Google Cloud datasets（請自行串接後端 API）
     function saveDataToCloud(data) {
-      // 此函數模擬將資料送往後端，後端再與 Google Cloud 的 datasets 做串接
       console.log('Saving to Google Cloud:', data);
       fetch('/saveData', {
         method: 'POST',
@@ -164,6 +209,7 @@
       });
     }
 
+    // 點擊地圖新增標記，並將標記加入目前圖層
     function addMarkerToCurrentLayer(location) {
       const marker = new google.maps.Marker({
         position: location,
@@ -172,8 +218,11 @@
       });
       currentLayerMarkers.push(marker);
       addLayer('新增點');
+      // 同時模擬存入雲端
+      saveDataToCloud({ type: 'marker', position: { lat: location.lat(), lng: location.lng() } });
     }
 
+    // 處理檔案匯入：依副檔名處理 KML、JSON、CSV
     function handleFileSelect(evt) {
       const files = evt.target.files;
       for (let i = 0; i < files.length; i++) {
@@ -181,17 +230,17 @@
         const reader = new FileReader();
         reader.onload = function(e) {
           const content = e.target.result;
-          if (file.name.endsWith('.kml')) {
-            // KML 匯入：利用 KmlLayer（注意：Blob URL 可能受瀏覽器安全性限制）
+          if (file.name.toLowerCase().endsWith('.kml')) {
+            // 利用 KmlLayer 匯入 KML 檔案
             const kmlLayer = new google.maps.KmlLayer({
               url: URL.createObjectURL(new Blob([content], {type: 'application/vnd.google-earth.kml+xml'})),
               map: map
             });
             layers.push(kmlLayer);
             addLayer(file.name);
-          } else if (file.name.endsWith('.json')) {
+          } else if (file.name.toLowerCase().endsWith('.json')) {
+            // 假設 JSON 為點資料陣列：每個物件含 lat, lng, name
             const jsonData = JSON.parse(content);
-            // 假設 JSON 為點資料陣列，欄位含 lat, lng, name
             jsonData.forEach(item => {
               const marker = new google.maps.Marker({
                 position: { lat: item.lat, lng: item.lng },
@@ -201,8 +250,8 @@
               currentLayerMarkers.push(marker);
             });
             addLayer(file.name);
-          } else if (file.name.endsWith('.csv')) {
-            // 簡易 CSV 解析，假設格式：lat,lng,name
+          } else if (file.name.toLowerCase().endsWith('.csv')) {
+            // 簡易 CSV 解析，格式：lat,lng,name
             const lines = content.split('\n');
             lines.forEach(line => {
               const parts = line.split(',');
@@ -222,22 +271,23 @@
             });
             addLayer(file.name);
           }
-          // 匯入後順便將資料存入 Google Cloud（透過後端處理）
+          // 匯入後模擬存入雲端
           saveDataToCloud({ importedFile: file.name, content: content });
         };
         reader.readAsText(file);
       }
     }
 
+    // 將新增的圖層名稱加入左側列表中
     function addLayer(name) {
       const li = document.createElement('li');
       li.textContent = name;
       document.getElementById('layer-list').appendChild(li);
     }
 
+    // 調整 POI 顯示密度：依據 slider 數值模擬在瑞士附近隨機產生標記
     function adjustPOIDensity(value) {
-      // 模擬依據 slider 調整地標密度，實際應用可根據 Places API 更新資料
-      console.log('調整 POI 密度為:', value);
+      // 清除舊的 POI 標記
       poiMarkers.forEach(marker => marker.setMap(null));
       poiMarkers = [];
       const numMarkers = Math.floor(value);
@@ -254,26 +304,6 @@
         });
         poiMarkers.push(marker);
       }
-    }
-
-    function initSearchBox() {
-      // 加入搜尋框，方便查詢地點（使用 Places Autocomplete）
-      const input = document.createElement('input');
-      input.id = 'search-box';
-      input.type = 'text';
-      input.placeholder = '搜尋地點...';
-      map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
-      const autocomplete = new google.maps.places.Autocomplete(input);
-      autocomplete.bindTo('bounds', map);
-      autocomplete.addListener('place_changed', function() {
-        const place = autocomplete.getPlace();
-        if (!place.geometry) {
-          alert("找不到此地點");
-          return;
-        }
-        map.setCenter(place.geometry.location);
-        map.setZoom(12);
-      });
     }
 
     // 初始化地圖
